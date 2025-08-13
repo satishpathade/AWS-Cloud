@@ -9,7 +9,7 @@ It’s designed to demonstrate my **practical cloud computing and DevOps abiliti
    - Launch and configure AWS EC2 instances  
    - Connect securely via SSH  
    - Configure Security Groups and key pairs  
-     [01-ec2-login](01-ec2-login)
+     [ec2-login](ec2-login)
 
 2. **Hosting Static Websites**  
    - Deploy HTML/CSS/JS websites on EC2  
