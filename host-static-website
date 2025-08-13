@@ -1,0 +1,33 @@
+# Host a Static Website on EC2
+
+How to host a **static HTML/CSS/JS website** on your AWS EC2 instance using **Nginx**.
+
+## Step 1: Install Nginx
+**Amazon Linux:**
+```powershell
+
+  sudo yum update -y                (update instance)
+  sudo yum install nginx -y         (install nginx)
+
+## Step 2: Start and Enable Nginx
+  sudo service nginx start          (start nginx)
+  sudo service nginx status         (check status)
+
+## Step 3: Upload or Extract Your Website Files
+  1)  scp -i "your-key-path.pem" website.zip ec2-user@<EC2_PUBLIC_IP>:.    (upload project)
+  2)  Navigate to website folder and unzip:
+
+      cd /usr/share/nginx/html       (default Nginx directory)
+      sudo rm index.html             (remove default file)
+      sudo unzip ~/website.zip       (unzip project files)
+      sudo chown -R nginx:nginx *    (set permissions -Amazon Linux)
+
+## Step 4: Check Security Group
+Ensure HTTP (Port 80) is allowed in your EC2 Security Group. 
+
+## Step 6: Access Your Website
+http://<EC2_PUBLIC_IP>
+
+⚡ Quick Tips
+Restart Nginx after changes:
+  sudo service nginx restart 
