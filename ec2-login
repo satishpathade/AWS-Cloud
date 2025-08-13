@@ -1,0 +1,42 @@
+# AWS EC2 Login :
+
+Learn how to **launch and connect to an EC2 instance** 
+---
+
+## step 1: Open AWS Console
+1. Go to [AWS Console](https://aws.amazon.com/console/) and log in.  
+2. Click **EC2** under **Compute Services**.
+---
+
+## Step 2: Launch EC2 Instance
+1. Click **Launch Instance**  
+2. Choose **Amazon Linux 2 AMI** (or Ubuntu).  
+3. Select instance type: **t2.micro** (Free Tier).  
+4. Create a **new key pair** or use an existing one.  Download your `.pem | ppk` key file and save it securely.    
+5. Configure **Security Group**:
+    SSH (Port 22) → for connecting via terminal  
+    HTTP (Port 80) → for hosting websites  
+    HTTPS (Port 443) → for secure websites  
+6. Click **Launch Instance**
+---
+
+## Step 3: Connect to Your EC2 Instance using SSH
+1. Open your terminal and navigate to the folder containing the key.
+2. ssh -i "your-key-path.pem" ec2-user@ec2publicip  (For Ubuntu instances, replace ec2-user with ubuntu)
+---
+
+## Step 4:  Verify Connection
+  whoami       # should show ec2-user
+  pwd          # shows current directory
+  ls -la       # list files
+---
+
+## Step 5: Keep your instance updated:
+  sudo yum update -y      # Amazon Linux
+  sudo apt update && sudo apt upgrade -y  # Ubuntu
+
+⚡ Note:
+Always keep your .pem | ppk key safe and private.
+Only connect from trusted devices.
+Use exit to disconnect from EC2.
+Record your instance ID and public IP for future reference.
