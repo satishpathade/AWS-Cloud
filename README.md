@@ -15,7 +15,7 @@ It’s designed to demonstrate my **practical cloud computing and DevOps abiliti
    - Deploy HTML/CSS/JS websites on EC2  
    - Configure Nginx for static content  
    - Upload and manage website files  
-     [02-host-static-website](02-host-static-website/README.md)
+     [host-static-website](host-static-website)
 
 3. **Dynamic Websites (LAMP/LEMP Stack)**  
    - Set up PHP + MySQL web applications  
