@@ -1,0 +1,336 @@
+# Host LAMP & LEMP Stacks on AWS EC2 (Amazon Linux)
+
+This repo-ready guide shows **step-by-step** how to host a website/app on an EC2 instance using either:
+
+* **LEMP**: Linux + **Nginx** + **MariaDB/MySQL** + **PHP-FPM**
+* **LAMP**: Linux + **Apache (httpd)** + **MariaDB/MySQL** + **PHP**
+---
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Security Group (Ports)](#security-group-ports)
+3. [LEMP (Nginx + PHP-FPM)](#lemp-nginx--php-fpm)
+4. [LAMP (Apache httpd)](#lamp-apache-httpd)
+5. [Deploying from GitHub](#deploying-from-github)
+6. [Create/Secure Database](#createsecure-database)
+7. [Sample PHP App (DB Test)](#sample-php-app-db-test)
+8. [Quick Service Commands](#quick-service-commands)
+9. [Troubleshooting](#troubleshooting)
+10. [Optional: Domain & HTTPS (High Level)](#optional-domain--https-high-level)
+
+---
+
+## Prerequisites
+
+* An **EC2** instance         (Amazon Linux)
+* An **SSH key** to connect:
+
+  ssh -i "your-key.pem" ec2-user@<EC2_PUBLIC_IP>
+  ```
+* **Root/sudo** access on the instance
+
+Update packages first:
+
+sudo yum update -y             (Amazon Linux)
+---
+
+## Security Group (Ports)
+
+Open these inbound rules on the EC2 **Security Group** attached to the instance:
+
+* **80/tcp** (HTTP) – Anywhere (0.0.0.0/0)
+* **443/tcp** (HTTPS) – Anywhere (for SSL later)
+* **22/tcp** (SSH) – Your IP only 
+---
+
+## LEMP (Nginx + PHP-FPM)
+
+### 1) Install Nginx | PHP-FPM | MariaDB
+
+      sudo yum install nginx mariadb-server php php-fpm -y             (install stack)
+
+### 2) Start Services
+
+      sudo service nginx start 
+      sudo service php-fpm start 
+      sudo service mariadb start
+      sudo nginx -t               (chech error)
+
+### 3) Clone your GitHub repo
+
+       cd /usr/share/nginx/html           (default nginx html path)
+       cd /usr/share/nginx/myapp          (if you used a custom path)
+       sudo rm -rf *                      (delete default index file)
+       sudo wget "git-hub repo link"      (download project)
+       sudo chown -R nginx:nginx /usr/share/nginx/html    (Set permissions so Nginx can read files)
+
+### 4) Open browser
+      http://ec2-publicip                                     (or custom folder name)
+
+
+## LAMP (Apache httpd)
+
+### 1) Install Apache | PHP | MariaDB
+
+       sudo yum install httpd mariadb-server php -y           (install stack)
+
+### 2) Start Services
+
+       sudo service httpd start 
+       sudo service marisdb start
+    -Amazon Linux with LAMP you don’t need to start PHP as a separate service
+    -In LAMP (Apache) → Apache loads PHP as a module (mod_php). when Apache is running, PHP is already active inside it.
+
+    Verify PHP is working :
+    echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/index.php   (demo file)
+    open in your browser:
+    http://ec2-publicip/index.php
+
+    After testing, delete the file (security best practice):
+
+### 3) Permissions (Apache user)
+
+        sudo chown -R apache:apache /var/www/html          (Apache ownership)
+        sudo chmod -R 755 /var/www/html                    (File permission)
+
+## Deploying from GitHub
+
+### One-time setup
+
+        sudo yum install unzip -y
+        cd /var/www/html
+sudo wget https://github.com/<your-username>/<your-repo>.git .
+
+### Update when you push new code
+
+      # Then reload web server
+       -Nginx:
+       sudo service nginx reload
+       -Apache:
+       sudo service httpd reload
+
+> Tip: Keep your **public web files** inside `/var/www/html/ so both Nginx and Apache serve from the same place.
+---
+
+## Create/Secure Database
+
+### Start MariaDB & secure it
+
+        sudo service mariadb start
+        sudo mysql_secure_installation
+# Set a root password, remove anonymous users, disallow remote root login, remove test DB, reload privileges.
+
+### Create DB and user
+
+```sql
+-- Login as root
+mysql -u root -p
+
+-- Inside MySQL/MariaDB shell
+CREATE DATABASE myapp_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'myapp_user'@'localhost' IDENTIFIED BY 'StrongP@ssw0rd!';
+GRANT ALL PRIVILEGES ON myapp_db.* TO 'myapp_user'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+> For remote DB access, restrict by IP instead of `localhost`, open SG port 3306 carefully, and consider using RDS for production.
+
+---
+
+## Sample PHP App (DB Test)
+
+Create a quick test app that checks PHP and DB connectivity.
+
+```bash
+sudo tee /var/www/myapp/public/index.php > /dev/null <<'PHP'
+<?php
+// PHP info quick check at /phpinfo
+if (isset($_GET['phpinfo'])) {
+    phpinfo();
+    exit;
+}
+
+$host = '127.0.0.1';
+$db   = 'myapp_db';
+$user = 'myapp_user';
+$pass = 'StrongP@ssw0rd!';
+$dsn  = "mysql:host=$host;dbname=$db;charset=utf8mb4";
+
+try {
+    $pdo = new PDO($dsn, $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+    echo "<h2>✅ DB connection successful!</h2>";
+    $pdo->query("CREATE TABLE IF NOT EXISTS healthcheck (ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+    $pdo->query("INSERT INTO healthcheck () VALUES ()");
+    $row = $pdo->query("SELECT COUNT(*) as c FROM healthcheck")->fetch();
+    echo "<p>Healthcheck rows: ".$row['c']."</p>";
+} catch (Exception $e) {
+    http_response_code(500);
+    echo "<h2>❌ DB connection failed:</h2><pre>".$e->getMessage()."</pre>";
+}
+
+echo '<p>PHP running. For phpinfo, open: <code>?phpinfo=1</code></p>';
+PHP
+```
+
+* Open: `http://<EC2_PUBLIC_IP>/` → should show DB success
+* Open: `http://<EC2_PUBLIC_IP>/?phpinfo=1` → PHP details page
+
+> ⚠️ Remove `phpinfo` in production.
+
+---
+
+## Quick Service Commands
+
+**Nginx**
+
+```bash
+sudo systemctl restart nginx
+sudo nginx -t        # test config
+journalctl -u nginx --no-pager -n 100
+```
+
+**PHP-FPM**
+
+```bash
+sudo systemctl restart php-fpm
+journalctl -u php-fpm --no-pager -n 100
+```
+
+**Apache (httpd)**
+
+```bash
+sudo systemctl restart httpd
+sudo apachectl configtest
+journalctl -u httpd --no-pager -n 100
+```
+
+**MariaDB**
+
+```bash
+sudo systemctl restart mariadb
+mysql -u root -p
+```
+
+---
+
+## Troubleshooting
+
+* **403/404**: Check your **DocumentRoot/root** path and file permissions.
+* **502 Bad Gateway (Nginx)**: PHP-FPM down or wrong socket. Verify `php-fpm` is running and your `fastcgi_pass` path (usually `/run/php-fpm/www.sock`).
+* **`nginx -t`/`apachectl configtest` fails**: Fix syntax errors shown, then reload.
+* **White page**: Check PHP errors (enable `display_errors` in dev or check logs).
+* **Logs**:
+
+  * Nginx: `/var/log/nginx/error.log`
+  * Apache: `/var/log/httpd/error_log`
+  * PHP-FPM: `journalctl -u php-fpm`
+
+---
+
+## Optional: Domain & HTTPS (High Level)
+
+1. Point your **A record** (`@` and `www`) to the EC2 **public IP**.
+2. Install **Certbot** for Nginx/Apache (packages vary by distro).
+3. Issue a certificate and auto-renew (cron/systemd timer). Example (Nginx flavor varies by distro):
+
+   ```bash
+   sudo certbot --nginx -d example.com -d www.example.com
+   # or for Apache
+   sudo certbot --apache -d example.com -d www.example.com
+   ```
+
+---
+
+## Bonus: Simple Automation Scripts
+
+> Save these into the repo under `scripts/` and run with `bash`. **Review before running**.
+
+### `scripts/setup-lemp.sh`
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+sudo yum update -y
+sudo yum install -y nginx mariadb-server php php-fpm php-mysqlnd git unzip
+
+sudo systemctl enable --now nginx php-fpm mariadb
+
+sudo mkdir -p /var/www/myapp/public
+sudo tee /var/www/myapp/public/index.php > /dev/null <<'PHP'
+<?php echo "LEMP is live!"; ?>
+PHP
+
+sudo tee /etc/nginx/conf.d/myapp.conf > /dev/null <<'NGINX'
+server {
+    listen 80;
+    server_name _;
+    root /var/www/myapp/public;
+    index index.php index.html;
+    location / { try_files $uri $uri/ /index.php?$query_string; }
+    location ~ \.php$ {
+        include /etc/nginx/fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/run/php-fpm/www.sock;
+    }
+}
+NGINX
+
+sudo nginx -t && sudo systemctl reload nginx
+sudo chown -R nginx:nginx /var/www/myapp
+```
+
+### `scripts/setup-lamp.sh`
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+sudo yum update -y
+sudo yum install -y httpd mariadb-server php php-mysqlnd git unzip
+
+sudo systemctl enable --now httpd mariadb
+
+sudo mkdir -p /var/www/myapp/public
+sudo tee /var/www/myapp/public/index.php > /dev/null <<'PHP'
+<?php echo "LAMP is live!"; ?>
+PHP
+
+sudo tee /etc/httpd/conf.d/myapp.conf > /dev/null <<'APACHE'
+<VirtualHost *:80>
+    ServerName _
+    DocumentRoot /var/www/myapp/public
+    <Directory /var/www/myapp/public>
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+APACHE
+
+sudo apachectl configtest && sudo systemctl reload httpd
+sudo chown -R apache:apache /var/www/myapp
+```
+
+---
+
+## Repo Structure Suggestion
+
+```
+.
+├── README.md                # This file
+├── scripts/
+│   ├── setup-lemp.sh
+│   └── setup-lamp.sh
+└── sample-app/
+    └── public/
+        └── index.php        # You can replace with your app
+```
+
+---
+
+**You’re ready!** Pick **LEMP** or **LAMP**, follow the steps, and deploy your app. If you want, add GitHub Actions or a simple webhook to auto-deploy on `git push`. Let me know and I’ll include CI/CD templates too.
